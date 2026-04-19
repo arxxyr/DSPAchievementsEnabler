@@ -1,8 +1,9 @@
-﻿using BepInEx;
+using BepInEx;
 using BepInEx.Logging;
 
 using HarmonyLib;
 
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace AchievementsEnabler
@@ -36,13 +37,21 @@ namespace AchievementsEnabler
         public static bool EnablePlatformAchievements { get; set; } = false;
 
         [HarmonyPrefix]
-        // Disables GameAbnormalityData
+        // Disables legacy GameAbnormalityData_0925 entry points (still present in DSP 0.10.x)
         [HarmonyPatch(typeof(ABN.GameAbnormalityData_0925), nameof(ABN.GameAbnormalityData_0925.NotifyOnAbnormalityChecked))]
         [HarmonyPatch(typeof(ABN.GameAbnormalityData_0925), nameof(ABN.GameAbnormalityData_0925.TriggerAbnormality))]
         [HarmonyPatch(typeof(AbnormalityLogic), nameof(AbnormalityLogic.GameTick))]
+        // DSP 0.10.x added new notification entry points on AbnormalityLogic
+        [HarmonyPatch(typeof(AbnormalityLogic), nameof(AbnormalityLogic.NotifyBeforeGameSave))]
+        [HarmonyPatch(typeof(AbnormalityLogic), nameof(AbnormalityLogic.NotifyOnAssemblerRecipePick))]
+        [HarmonyPatch(typeof(AbnormalityLogic), nameof(AbnormalityLogic.NotifyOnGameBegin))]
+        [HarmonyPatch(typeof(AbnormalityLogic), nameof(AbnormalityLogic.NotifyOnMechaForgeTaskComplete))]
+        [HarmonyPatch(typeof(AbnormalityLogic), nameof(AbnormalityLogic.NotifyOnUnlockTech))]
+        [HarmonyPatch(typeof(AbnormalityLogic), nameof(AbnormalityLogic.NotifyOnUseConsole))]
         // Disables uploading data to Milky Way
         [HarmonyPatch(typeof(MilkyWayWebClient), nameof(MilkyWayWebClient.SendUploadLoginRequest))]
         [HarmonyPatch(typeof(MilkyWayWebClient), nameof(MilkyWayWebClient.SendUploadRecordRequest))]
+        // Legacy Steam leaderboard entry point
         [HarmonyPatch(typeof(STEAMX), nameof(STEAMX.UploadScoreToLeaderboard))]
         public static bool Skip()
         {
@@ -60,6 +69,19 @@ namespace AchievementsEnabler
         [HarmonyPatch(typeof(RailAchievementManager), nameof(RailAchievementManager.UnlockAchievement))]
         [HarmonyPatch(typeof(RailAchievementManager), nameof(RailAchievementManager.Update))]
         [HarmonyPatch(typeof(RailAchievementManager), nameof(RailAchievementManager.Start))]
+        // DSP 0.10.x split leaderboard uploads into four dedicated managers
+        [HarmonyPatch(typeof(SteamLeaderboardManager_ClusterGeneration), nameof(SteamLeaderboardManager_ClusterGeneration.Start))]
+        [HarmonyPatch(typeof(SteamLeaderboardManager_ClusterGeneration), nameof(SteamLeaderboardManager_ClusterGeneration.Update))]
+        [HarmonyPatch(typeof(SteamLeaderboardManager_ClusterGeneration), nameof(SteamLeaderboardManager_ClusterGeneration.UploadScore))]
+        [HarmonyPatch(typeof(SteamLeaderboardManager_PowerConsumption), nameof(SteamLeaderboardManager_PowerConsumption.Start))]
+        [HarmonyPatch(typeof(SteamLeaderboardManager_PowerConsumption), nameof(SteamLeaderboardManager_PowerConsumption.Update))]
+        [HarmonyPatch(typeof(SteamLeaderboardManager_PowerConsumption), nameof(SteamLeaderboardManager_PowerConsumption.UploadScore))]
+        [HarmonyPatch(typeof(SteamLeaderboardManager_SolarSail), nameof(SteamLeaderboardManager_SolarSail.Start))]
+        [HarmonyPatch(typeof(SteamLeaderboardManager_SolarSail), nameof(SteamLeaderboardManager_SolarSail.Update))]
+        [HarmonyPatch(typeof(SteamLeaderboardManager_SolarSail), nameof(SteamLeaderboardManager_SolarSail.UploadScore))]
+        [HarmonyPatch(typeof(SteamLeaderboardManager_UniverseMatrix), nameof(SteamLeaderboardManager_UniverseMatrix.Start))]
+        [HarmonyPatch(typeof(SteamLeaderboardManager_UniverseMatrix), nameof(SteamLeaderboardManager_UniverseMatrix.Update))]
+        [HarmonyPatch(typeof(SteamLeaderboardManager_UniverseMatrix), nameof(SteamLeaderboardManager_UniverseMatrix.UploadScore))]
         public static bool SkipPlatform()
         {
             return EnablePlatformAchievements;
@@ -72,6 +94,22 @@ namespace AchievementsEnabler
             __instance.triggerTime = 0;
             __instance.protoId = 0;
             __instance.evidences = new long[0];
+        }
+
+        // DSP 0.10.x moved abnormality detection into a registry of AbnormalityDeterminator.
+        // Unregister every determinator right after the game initialises them so nothing can flag
+        // the save afterwards.
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(AbnormalityLogic), nameof(AbnormalityLogic.InitDeterminators))]
+        public static void AbnormalityLogic_InitDeterminators_Postfix(AbnormalityLogic __instance)
+        {
+            var determinators = __instance?.determinators;
+            if (determinators == null) return;
+            foreach (var pair in determinators)
+            {
+                pair.Value?.OnUnregEvent();
+            }
+            __instance.determinators = new Dictionary<int, AbnormalityDeterminator>();
         }
 
         [HarmonyPrefix]

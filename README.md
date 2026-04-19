@@ -14,6 +14,15 @@ Follow the instructions from the [DSP Wiki](https://dsp-wiki.com/Modding:Getting
 
 ## Changelog
 
+1.5.0:
+
+- Fixed compatibility with DSP 0.10.33 (Unity 2022.3 LTS migration)
+- Blocks the new `AbnormalityLogic` notification entry points (`NotifyBeforeGameSave`, `NotifyOnAssemblerRecipePick`, `NotifyOnGameBegin`, `NotifyOnMechaForgeTaskComplete`, `NotifyOnUnlockTech`, `NotifyOnUseConsole`)
+- Unregisters all `AbnormalityDeterminator` instances after `AbnormalityLogic.InitDeterminators`
+- Blocks the new per-board Steam leaderboard uploaders (`SteamLeaderboardManager_ClusterGeneration`, `_PowerConsumption`, `_SolarSail`, `_UniverseMatrix`)
+- Switched build target to `net472` to match the current DSP modding toolchain
+- Added a GitHub Actions CI workflow that builds the plugin on every push/PR
+
 1.4.0:
 
 - Fixed compatibility with DSP 0.9.25
