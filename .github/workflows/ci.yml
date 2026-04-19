@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'NuGet.Config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore AchievementsEnabler.csproj
+
+      - name: Build (Release)
+        run: dotnet build AchievementsEnabler.csproj -c Release --no-restore
+
+      - name: Upload plugin DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: AchievementsEnabler-dll
+          path: |
+            bin/Release/**/AchievementsEnabler.dll
+          if-no-files-found: error
